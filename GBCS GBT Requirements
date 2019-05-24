@@ -1,0 +1,134 @@
+7.2.11	Transfer of Large Remote Party Messages 
+All Devices which are not Type 2 Devices shall be capable of supporting the General Block Transfer (GBT) requirements of this Section 7.2.11.
+7.2.11.1	GBT Terminology and Parameters 
+A GBT Message shall be an APDU constructed and processed as defined by this Section 7.2.11.
+A GBT Message Series shall be the set of GBT Messages needed to exchange one complete Remote Party Message between a GBT Initiator and a GBT Recipient.
+For a Remote Party Command sent using a GBT Message Series, the GBT Initiator shall be the Access Control Broker and the GBT Recipient shall be the target Device.
+For a Remote Party Response or a Remote Party Alert sent using a GBT Message Series, the GBT Initiator shall be the sending Device and the GBT Recipient shall be the Access Control Broker.
+A GBT Third Party shall be the Remote Party identified by:
+•	in a Remote Party Command, the value in the Business Originator ID field; and
+•	in a Remote Party Response or a Remote Party Alert, the value in the Business Target ID field.
+GBT Streaming Window shall be the number of GBT Messages the GBT Initiator sends without receipt of a GBT Message (Acknowledgement), or since receipt of the most recent GBT Message (Acknowledgement).
+GBT Streaming Window shall be:
+•	63 where the GBT Message Series carries a Remote Party Response; and
+•	5 where the GBT Message Series carries a Remote Party Command.
+Maximum PDU Size shall be 1200 octets.
+7.2.11.2	Remote Party Message size
+Where a Remote Party Message exceeds the Maximum PDU Size, the GBT Initiator and the GBT Responder shall exchange the Remote Party Message in a GBT Message Series.
+Where a Remote Party Message does not exceed the Maximum PDU Size, the GBT Initiator and the GBT Responder may exchange the Remote Party Message in a GBT Message Series.
+7.2.11.3	GBT Message Structure
+A GBT Message shall, if it is a GBT Message (Acknowledgement) or a GBT Message (Request Block Resend), be the concatenation:
+Message Routing Header || GBT Header
+A GBT Message shall, if it is neither a GBT Message (Acknowledgement) nor a GBT Message (Request Block Resend), be the concatenation:
+Message Routing Header || GBT Header || GBT Block Data
+where:
+•	Message Routing Header shall be structured and populated according to Table 7.2.11.5. Note that Message Routing Header (1) uniquely identifies the GBT Message Series, (2) identifies whether the GBT Message is being sent to or from the Device and (3) unambiguously ties all GBT Messages in the GBT Message Series to the single Remote Party Message being exchanged;
+•	GBT Header shall be structured and populated according to Table 7.2.11.6; and
+•	GBT Block Data shall be the part of the Remote Party Message, constructed as per Section 7.2.11.4, being carried in this GBT Message.
+7.2.11.4	GBT Message processing
+The GBT Initiator shall, once the Remote Party Message is fully constructed and all cryptographic protections are applied, slice the octet string produced so that:
+1.	GBT Block Data with GBT Initiator Block Number of 1 is the 1149 most significant octets of the Remote Party Message, or all of the octets if the size of the Remote Party Message is less than 1149 bytes;
+2.	GBT Block Data with GBT Initiator Block Number of 2 is the next 1149 most significant octets of the Remote Party Message, or all of the octets if the size of the remaining octets in Remote Party Message is less than 1149 bytes; and
+3.	remaining GBT Block Data are created by repeating Step 2, each time incrementing GBT Initiator Block Number by 1, until there are no remaining octets in the Remote Party Message.
+The GBT Recipient shall not undertake any processing of the Remote Party Message carried in a GBT Message Series until it has received:
+•	a GBT Message in this GBT Message Series where the ‘last-block’ field contains 0b1 (meaning last block); and
+•	all GBT Messages in this GBT Message Series with ‘block-number’ fields less than the ‘block-number’ field in the last block.  Where the GBT Recipient has not received all such GBT Messages, it shall send a GBT Message (Request Block Resend) for each missing block-number.  Where the GBT Recipient is a Device, it may discard all blocks in a GBT Message Series if it has received no response to a GBT Message (Request Block Resend) after 60 minutes.
+When a GBT Recipient receives a GBT Message with ‘block-number’ being an integer multiple of GBT Streaming Window for this GBT Message Series, it shall send a GBT Message (Acknowledgement).
+GBT Recipient Block Number shall be set to 0x0001 in the first GBT Message sent by the GBT Recipient.  It shall be incremented by 1 in each subsequent GBT Message it sends.
+GBT Initiator Block Number Ack shall be the highest of:
+•	0x0000; and
+•	the highest block-number in any GBT Message the GBT Initiator has received in this GBT Message Series.
+GBT Recipient Block Number Ack shall:
+•	in a GBT Message (Acknowledgement), be the highest block-number in any GBT Message the GBT Recipient has received in this GBT Message Series; and
+•	in a GBT Message (Request Block Resend), the value of block-number up to which the GBT Recipient has received all the prior numbered GBT Messages in this GBT Message Series.
+7.2.11.5	Message Routing Header
+Message Routing Header
+No	xDLMS Message Elements 	Contents	Length (octets)	Note
+	general-ciphering 	0xDD	1	Tag used is the same as for a normal DLMS General-Ciphering header
+	transaction-id 			
+	   Length	0x09	1	Length of Originator Counter 
+	   Value	See ‘Note’ column	9	Shall be populated with the corresponding field from the Grouping Header in the Remote Party Message that is being carried in this GBT Message Series
+	originator-system-title 			
+	   Length	0x08	1	Length of Entity Identifier
+	   Value	Business Originator ID	8	If the GBT Message is sent from the Device, the value shall be the Entity Identifier of the Device. 
+If the GBT Message is sent to the Device, the value shall be the Entity Identifier of the GBT Third Party
+	recipient-system-title 			
+	   Length	0x08	1	Length of Entity Identifier
+	   Value	Business Target ID	8	If the GBT Message is sent to the Device, the value shall be the Entity Identifier of the Device. 
+If the GBT Message is sent from the Device, the value shall be the Entity Identifier of the GBT Third Party.
+	date-time 	0x00	1	A value for this element is not needed so the length field is 0x00
+	other-information 			
+	   Length	0x02	1	Length of Message Code
+	   Value	Message Code	2	Shall be populated with the corresponding field from the Grouping Header in the Remote Party Message that is being carried in this GBT Message Series
+	key-info 	0x00	1	key-info values are not present so encoded as 0x00
+	ciphered-service			
+	Length	Encoding(X)	Len(Encoding(X))	X shall be the length in octets of the subsequent parts of the GBT Message after this length value.  
+	   security header			
+	      security control byte (SC)	0x01	1	Specifies that no MAC field is present at the end of the APDU
+	      invocation counter (IC)	0x00000000	4	IC is always zero 
+Table 7.2.11.5:  Message Routing Header
+7.2.11.6	GBT Header
+GBT Header
+No	xDLMS Message Elements	Contents	Length (octets)	Note
+	general-block-transfer	0xE0	1	xDLMS APDU tag for General-Block-Transfer
+	   block-control			
+	      last-block (bit 7)	See ‘Note’ column	1/8	0b0 if not the last GBT Message in this GBT Message Series the sender has to send, or 
+0b1 if this is the last GBT Message in this GBT Message Series the sender has to send
+	      streaming (bit 6)	See ‘Note’ column	1/8	0b1 if the sender has at least one more GBT Message in this GBT Message Series to send or
+0b0 if this is the last GBT Message in this GBT Message Series the sender has to send
+	      window (bits 5 – 0)	0b11111 or
+0b00101	5/8	The value of GBT Streaming Window as required by Section 7.2.11.1.
+
+	   block-number 	See ‘Note’ column	2	GBT Initiator Block Number, if this GBS Message is sent by the GBT Initiator.
+GBT Recipient Block Number, if this GBS Message is sent by the GBT Recipient.
+	   block-number-ack	See ‘Note’ column	2	GBT Initiator Block Number Ack, if this GBS Message is sent by the GBT Initiator.
+GBT Recipient Block Number Ack, if this GBS Message is sent by the GBT Recipient.
+	   block-data			
+	      Length	Encoding(X)	Len(Encoding(X))	X is the length in octets of the following parts of this APDU.
+Table 7.2.11.6:  GBT Header
+7.2.11.7	Illustrations – informative
+GBT allows for the transport of Messages where the Message is greater than the Maximum PDU Size.   A number of Use Cases can result in this larger Message size, either as a Command or a Response.  There are no Alert Use Cases that result in the larger Message size. 
+GBT does not change any part of the Remote Party Message content that is being transported. 
+Example 1:  A small Command with small Response – e.g. read MPAN.
+Without GBT, the Command is:
+MAC Header || Grouping Header || read MPAN Command Payload || 0x00 || ACB-SME MAC
+and the Response is:
+MAC Header || Grouping Header || read MPAN Response Payload || 0x00 || SMD-KRP MAC
+GBT can be applied to this Use Case.  The Command becomes:
+Message Routing Header || GBT Header || MAC Header || Grouping Header || read MPAN Command Payload || 0x00 || ACB-SME MAC
+and the Response becomes:
+Message Routing Header || GBT Header || MAC Header || Grouping Header || read MPAN Response Payload || 0x00 || SMD-KRP MAC
+Example 2: A large Command with small Response – e.g. set tariff on an ESME where the tariff is complex. 
+Without GBT, the Command is:
+MAC Header || Grouping Header || set Tariff Command Payload || 0x40 || KRP Signature || ACB-SME MAC
+For the purposes of example, assume this is divided into three blocks, so block-numbers 1, 2 and 3.  Actual set tariff Commands will vary from this number of blocks.
+The Command is transmitted as the GBT Message Series:
+Message Routing Header || GBT Header || block 1
+Message Routing Header || GBT Header || block 2
+Message Routing Header || GBT Header || block 3
+This is reconstructed at the ESME, by concatenating blocks 1, 2 and 3 to give: 
+MAC Header || Grouping Header || set Tariff Command Payload || 0x40 || KRP Signature || ACB-SME MAC
+The Response would have the following structure:
+Message Routing Header || GBT Header || Grouping Header || Response Payload || 0x40 || SMD Signature
+It will be smaller than the Maximum PDU Size and so can be sent as a single APDU without any use of GBT.
+Example 3: small Command with large Response – e.g. read half-hourly profile (Export) 
+The Command is:
+MAC Header || Grouping Header || read half-hourly profile (Export) Command Payload || 0x00 || ACB-SME MAC
+It will be smaller than the Maximum PDU Size and so can be sent as a single APDU without any use of GBT.
+The ESME Response is:
+MAC Header || Grouping Header || read half-hourly profile (Export) Response Payload || 0x00 || SMD-KRP MAC
+Assuming that there are 75 blocks to send the GBT Message Series would, if no retries are needed, be as follows:
+The ESME will send:
+Message Routing Header || GBT Header || Block 1
+…
+Message Routing Header || GBT Header || Block 63
+and wait for acknowledgement.  
+The Access Control Broker will construct and send that acknowledgement whose structure is:
+     Message Routing Header || GBT Header
+When this acknowledgement is received by the ESME, the ESME will send:
+Message Routing Header || GBT Header || Block 64
+…
+Message Routing Header || GBT Header || Block 75
+When the whole Message is received by the Access Control Broker, the Response can then be reconstructed:
+MAC Header || Grouping Header || read half-hourly profile (Export) Response Payload || 0x00 || SMD-KRP MAC
+Once the response has been reconstructed, the MAC can be checked.
